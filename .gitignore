@@ -47,3 +47,6 @@ data
 
 #Ignore R Data files
 *.RData
+
+#Ignore python project files
+.idea
