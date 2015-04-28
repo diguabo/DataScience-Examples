@@ -43,7 +43,7 @@ Temporary Items
 .apdisk
 
 #Ignore Data Directory
-data
+_data
 
 #Ignore R Data files
 *.RData
