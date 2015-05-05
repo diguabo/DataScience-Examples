@@ -42,11 +42,9 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-#Ignore Data Directory
+#Ignore Directories
 _data
+.ipynb_checkpoints
 
 #Ignore R Data files
 *.RData
-
-#Ignore python project files
-.idea

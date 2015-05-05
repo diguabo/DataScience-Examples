@@ -1,42 +1,42 @@
-# Practical Implementation of Machine Learning Algorithms in R and Python 
+# Practical Implementation of Machine Learning Algorithms on Datasets
 
-Implementation of basic Machine algorithms in both R and Python
+Implementation of basic Machine algorithms  on Open datasets
 
-The dataset(s) used for this are as below 
+The datasets used for this are referenced below
 
-US Airlines Datasets - <http://stat-computing.org/dataexpo/2009/the-data.html>
 
-Iris Flower Dataset - <https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data>
+- US Airlines Datasets - <http://stat-computing.org/dataexpo/2009/the-data.html>
+
+- Iris Flower Dataset - <https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data>
 
 ------------------------------------------------------------------------------------
-
-
 ### Airline Delay Prediction
 
-Attempt to predict  Departure delays for flights originating from JFK Airport using 2007 data.
+**Description :** In this example I attempted to predict  Departure delays for flights originating from JFK Airport using 2007 data.
 
-Note: Filtered out Cancelled flights but retained diverted flights
+**Code Language :** R 
 
-#### Key Features used for prediction:  
+**Algorithm(s) used :** Logistic Regression
 
+**Key Features used for prediction :**   
 * Month of Year
 *  Hour of Departure
 *  Carrier 
 *  Destination
 *  Distance (as a quantile range) 
 
-
-
-> *TODO : Python Implementation*
-
-
+------------------------------------------------------------------------------------
 ### Iris Flower Class Labelling
 
-Python implementation of Random Forest algorithm on classic machine learning dataset Fisher's Iris dataset
+**Description :**  In this example I attempted to predict the Plant Species on  a very classic dataset  - Fisher's Iris dataset
 
-**Python ML Package - scikit-learn**
+**Code Language :**  Python
+ 
+**ML Package(s) Used :**  scikit-learn
 
-### Features used for prediction
+**Algorithm(s) used :**  Random Forest
+
+**Key Features used for prediction :**   
 * sepal length
 *  sepal width
 *  petal length
