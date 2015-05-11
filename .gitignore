@@ -42,11 +42,14 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+#Ignore R Data files
+*.RData
+
 #Ignore custom Directories
 _data
 .ipynb_checkpoints
 Image_Object_detection
+Predicting_Airline_Delays\R Implementation\Predict_Airline_delays_cache
 
-#Ignore R Data files
-*.RData
+
 
