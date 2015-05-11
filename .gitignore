@@ -42,9 +42,10 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-#Ignore Directories
+#Ignore custom Directories
 _data
 .ipynb_checkpoints
+Image_Object_detection
 
 #Ignore R Data files
 *.RData
