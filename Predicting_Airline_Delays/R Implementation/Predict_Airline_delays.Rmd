@@ -1,0 +1,545 @@
+---
+title: "Predicting Airline Delays"
+author: "Pavan Keerthi"
+date: "Thursday, Apr 10, 2015"
+output: html_document
+---
+
+*******************************************
+
+
+**SYNOPSIS :** Implements a Logistic Regression Model on airline delays dataset 
+
+**DESCRIPTION :** The data used is from the below link.We use 2007 data to predict Departure delays for flights originating from JFK Airport  
+  
+  *Ref Links :* <http://stat-computing.org/dataexpo/2009/the-data.html>  
+
+**PARAMETERS :** NONE  
+**OUTPUTS :** Linear Regression Model  
+  
+*Version History*   
+  v0.1 - 16-Apr-2015 - Pavan Keerthi - Initial Version
+  
+*******************************************
+### Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+We make use of following libraries for this program
+
+**Hmisc :** Its cut2 function  
+**dplyr :** Its the most handy i find to work with data frames .Especially its select/filter/mutate functions are used extensively here  
+**stringr :** To manuplate string data types  
+**reshape2 :** To pivot/unpivot the dataframe as requried  
+**glm2 :** Machine Learning library to implement Logistic regression.It has few options which might be useful  
+**ggplot2 :** The best plotting library in R
+
+
+```{r loadlibs, message=FALSE}
+# Load required libraries.
+# Here order is important since these packages mask common functions
+library(Hmisc)
+library(dplyr) 
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(glm2)
+```
+
+Lets set working directory  
+*Note:* Change this to your local path
+
+```{r setwd}
+setwd("C:\\Users\\Pavan\\Work\\DataScience-Examples\\Predicting_Airline_Delays\\R Implementation")
+```
+
+Lets load the file as dataframe into memory  
+Its a quite a big file (670MB) so it may take few mins
+
+### Acquire data
+
+```{r loadcsv}
+# Load CSV data
+data<-read.csv("C:\\Users\\Pavan\\Work\\DataScience-Examples\\_data\\airlinedelays\\2007.csv",header=TRUE,sep=",",na.strings = "NA",stringsAsFactors =TRUE)
+```
+
+We will focus only on building Delay prediction model only for flights departing from **JFK** airport 
+
+```{r filter_df_jfk}
+# filter data frame to include only flight originating from JFK
+data <-filter(data,Origin =='JFK')
+```
+
+### Explore & Transform data
+
+Lets read the structure of data frame to get familiar with it
+
+```{r readdata_afterfilter}
+# Read Structure
+str(data)
+```
+
+First line from the output tells us that this dataset has 126366 rows and 29 columns
+The next lines give detail output and sample values of each column.We have int's and Factors (Strings were converted to Factors which is more effecient data structure )
+
+We also notice that there are some columns like *FlightNum* which is of integer data type.Its quite meaningless in this context so lets convert those too to factors
+
+```{r cnvrt_dt_inttofactr1}
+## Convert FlightNum
+data$Der_FlightNum<- as.factor(data$FlightNum)
+```
+
+We also have some columns like *cancelled,diverted, day,weeknum* as integer which would be more effiecient as Factors.So lets conver them too
+
+
+```{r cnvrt_dt_inttofactr2}
+# convert Cancelled,Diverted columns
+data$Der_Cancelled<-as.factor(data$Cancelled)
+data$Der_Diverted<-as.factor(data$Diverted)
+
+#convert Period columns
+data$Der_Day<-as.factor(data$DayofMonth)
+data$Der_Weekday<-as.factor(data$DayOfWeek)
+data$Der_Month<-as.factor(data$Month)
+data$Der_Year<-as.factor(data$Year)
+```
+
+Now lets read the structure again.Notice the new columns we derived above are now factors.
+
+```{r readdata_afterfactrconv}
+# Read Structure
+str(data)
+```
+
+At this stage I now have a question - "how exactly are Cancelled and Diverted flights impacting delays ?". We test this in next few lines
+
+```{r check_cancelledstats}
+# check Stats on Cancelled flights
+summary(select(filter(data,Der_Cancelled==1),DepDelay))
+```
+
+Here all are NA's.so we will filter them out
+
+```{r filter_cancelledflights}
+# Retain only "Not Cancelled" flights
+data <-filter(data,Cancelled==0)
+```
+
+```{r check_divertedstats}
+# check stats on Diverted flights 
+summary(select(filter(data,Der_Diverted==1),DepDelay))
+
+```
+
+There is some useful information here.So will retain it for further analysis
+
+
+Next step in exploration,I noticed some ArrTime is less than DepTime.I have a hunch it because all flight times are reported in local time zones. Lets check that 
+
+```{r check_Arrtimezones}
+#How many rows doe we have matching criteria?
+nrow(filter(data,ArrTime<DepTime))
+
+#read sample rows from top of the dataframe
+head(select(filter(data,ArrTime<DepTime),DayofMonth,Month,Year,FlightNum,Origin,Dest,Distance,DepTime,ArrTime),n=10)
+
+#read sample rows from bottom of the dataframe
+tail(select(filter(data,ArrTime<DepTime),DayofMonth,Month,Year,FlightNum,Origin,Dest,Distance,DepTime,ArrTime),n=10)
+```
+
+My intution was right.Based on Destination columns the Arrival times are probably adjusted for Destination Timezones.
+
+  NB: This could have been a issue for us had we not been provided with calculated values like *AirTime,DepDelay* 
+  
+
+In next step of Exploration ,I wanted to sense check stats on Departure Delays
+
+```{r Sample_DepDelays}
+#read sample rows from top of the dataframe
+head(select(data,DepDelay),n=10)
+
+#read sample rows from bottom of the dataframe
+tail(select(data,DepDelay),n=10)
+```
+
+Also check summary stats of *DepDelay*
+
+```{r stats_depdelay}
+#distribution of DepDelay
+summary(data$DepDelay)
+
+#variance of DepDelay
+var(data$DepDelay)
+
+#standard deviation of DepDelay
+sd(data$DepDelay)
+```
+
+Based on above analysis,it makes sensisble to consider a flight is actually **Delayed** only if the DepDelay is more than 15 mins.
+
+To code this lets add a binary flag to data frame based on the about assumed logic.
+
+```{r add_DerDepDelayedflag}
+ 
+#Add new column such that Der_DepDelayed=1 if DepDelay>15
+data <- mutate(
+  data,
+  Der_DepDelayed =  DepDelay>15
+)
+```
+
+
+```{r sample_derdepdelayed}
+#read sample rows for new column from top of the dataframe
+head(select(data,DepDelay,Der_DepDelayed),n=5)
+
+#read sample rows for new column from bottom of the dataframe
+tail(select(data,DepDelay,Der_DepDelayed),n=5)
+```
+
+```{r tabulate_derdepdelayed}
+#lets also tabulate the new column for whole dataset
+tabulate(as.factor(data$Der_DepDelayed))
+```
+
+so there are 88670 flight which are NOT delayed and 33598 actually delayed more than 15 mins.
+
+
+Finally,its also good to add a Identity columns to dataset before modelling
+
+```{r add_idcol}
+# Add Identity Coulmn to data frame
+data <- mutate(data, Id =seq.int(nrow(data)))
+```
+
+Lets see final structure after all derivations
+
+```{r read_finalstr}
+# See final structure
+str(data)
+```
+
+### Plot Correlations
+
+After our initial exploration of data is complete,now its time to dig deeper into relationships between data items.We do this by plotting correlation between some columns and Der_DepDelayed
+
+#### Average Delays by Month
+
+Lets plot delays by Month
+
+```{r df_monthlydelays}
+#gather the required data .
+##Calculate mean of delays by month
+MonthlyDelays <-summarise(group_by(
+  select(data,Der_Month,Der_DepDelayed),Der_Month
+),mean_delays=mean(Der_DepDelayed))
+MonthlyDelays$Der_Month = as.factor(MonthlyDelays$Der_Month)
+```
+
+```{r plot_delaysbymnth }
+Mgraph <- ggplot(MonthlyDelays)+
+  geom_bar(aes(x=Der_Month,y=mean_delays),stat="identity",width=0.5)+
+  labs(title="Flight Delays by Month",x="Month",y="Mean Delay")
+plot(Mgraph)
+```
+
+As we can see there is clearly higher delays in Months *Feb-Apr & Jun-Aug*. That a interesting pattern
+
+
+```{r rmv_tempobj1,echo=FALSE}
+##remove temp objects
+rm(MonthlyDelays)
+rm(Mgraph)
+```
+
+#### Average Delays by  Hour of Departure
+
+Lets plot delays by Hour
+
+```{r df_hourlydelays}
+#gather the required data .
+##Calculate mean of delays by hour
+HourlyDelays<-mutate(data,
+                     Der_Hour=str_replace(DepTime, str_sub(DepTime,start=-2),"")
+                     )
+HourlyDelays <-summarise(group_by(
+                                  select(HourlyDelays,Der_Hour,Der_DepDelayed
+                                         ),Der_Hour
+                                  ),mean_delays=mean(Der_DepDelayed)
+                         )
+
+### Convert Hour to int and sort the order
+HourlyDelays$Der_Hour <- as.integer(HourlyDelays$Der_Hour)
+HourlyDelays<-HourlyDelays[order(HourlyDelays$Der_Hour),]
+```
+
+```{r plot_hourlydelays}
+Hgraph <- ggplot(HourlyDelays)+
+  geom_bar(aes(x=Der_Hour,y=mean_delays),stat="identity",width=0.5)+
+  labs(title="Flight Delays by Hour",x="Hour",y="Mean Delay")+
+  scale_x_continuous( breaks=c(1:24))
+
+plot(Hgraph)
+```
+
+Again,we can see there is very high delays  if the departure times are between *1 AM - 4AM*
+
+```{r rmv_tempobj2,echo=FALSE}
+##remove temp objects
+rm(HourlyDelays)
+rm(Hgraph)
+```
+
+#### Average Delays by  Carrier
+
+Next lets plot delays by Airline Carrier
+
+```{r df_carrierdelays}
+#gather the required data .
+##Calculate mean of delays by hour
+CarrierDelays <-summarise(group_by(
+  select(data,UniqueCarrier,Der_DepDelayed),UniqueCarrier
+),mean_delays=mean(Der_DepDelayed))
+
+```
+
+```{r plot_carrierdelays}
+Cgraph <- ggplot(CarrierDelays)+
+  geom_bar(aes(x=UniqueCarrier,y=mean_delays),stat="identity",width=0.5)+
+  labs(title="Flight Delays by Carrier",x="Carrier",y="Mean Delay")
+
+plot(Cgraph)
+```
+
+Again some carriers have mroe delays than others but its not very pronounced pattern.
+
+```{r rmv_tempobj3,echo=FALSE}
+## remove temp objects
+rm(CarrierDelays)
+rm(Cgraph)
+```
+
+#### Average Delays by Distance
+ 
+Now lets plot delays by Distance.But we will do this by banding distance into 4 bands
+
+```{r  df_distancedelays}
+#gather the required data .
+##Calculate mean of delays by distance band
+DistanceDelays <- mutate(data,
+                         Der_DistanceBand=cut2(data$Distance,g=5))
+
+DistanceDelays <-summarise(group_by(
+  select(DistanceDelays,Der_DistanceBand,Der_DepDelayed),Der_DistanceBand
+),mean_delays=mean(Der_DepDelayed))
+
+```
+
+```{r plot_distancedelays}
+Dgraph <- ggplot(DistanceDelays)+
+  geom_bar(aes(x=Der_DistanceBand,y=mean_delays),stat="identity",width=0.5)+
+  labs(title="Flight Delays by Distance",x="Distance",y="Mean Delay")
+
+plot(Dgraph) 
+```
+
+It was interesting to see here that short haul flights from JFK are more delayed than long haul flights.there must be some inherent business process at play here but I dont know this domain well
+
+
+```{r rmv_tempobj4,echo=FALSE}
+## remove temp objects
+rm(DistanceDelays)
+rm(Dgraph)
+```
+
+#### Average Delays by Destination
+
+Finally lets plot delays by Desitnation.Here there are too many destinations so we will clip the plot to have only delays more than 30% of time 
+
+```{r  df_destinationdelays}
+#gather the required data .
+##Calculate mean of delays by destination
+DestDelays <-summarise(group_by(
+  select(data,Dest,Der_DepDelayed),Dest
+),mean_delays=mean(Der_DepDelayed))
+
+### Focus where MeanDelay is atleast 30%
+DestDelays <-filter(DestDelays,mean_delays>=0.30)
+```
+
+```{r plot_destinationdelays}
+Destgraph <- ggplot(DestDelays )+
+  geom_bar(aes(x=Dest,y=mean_delays),stat="identity",width=0.5)+
+  labs(title=expression(atop("Flight Dleays by Destinations", atop(italic("Total Delays atleast 30%"), ""))),sub="Destinations where delays are atleast 30%",x="Destination",y="Mean Delay")+
+  theme(axis.text.x=element_text(angle=90))
+
+plot(Destgraph) 
+```
+
+Here again some destinations are more consistently delayed than others.Again, there must be some business process at play here
+
+
+```{r rmv_tempobj5,echo=FALSE}
+## remove temp objects
+rm(DestDelays)
+rm(Destgraph)
+```
+
+This concludes our correlation analysis  
+
+### Feature Modelling
+
+Now its time to start modelling feature to train a machine learning algorithm  
+
+The overview is as follows  
+
+**Step 1 -** First we split the data into trian and test sets  
+
+**Step 2 -** We create feature matrixes with key columns (based on our above correlation analysis)  
+
+**Step 3 -** Then we train a logistic regression model using training matrix.  
+
+**Step 4 -** This model is then applied on test feature matrix for cross valdiation  
+
+**Step 5 -** Finally we measure metrics on accuracy of our trained algorithm  
+
+
+#### Create Train/Test Sets
+
+```{r split_triantest}
+# Find subset size
+samp_size<-nrow(data)/2
+
+## set the seed to make your partition reproductible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(data)), size = samp_size,replace=FALSE)
+
+## prepare Training and Test set
+traindata <- data[train_ind,]
+testdata <- data[-train_ind,]
+```
+We randomly split the train/test sets into 61134 rows each
+
+
+```{r rmv_tempobj6,echo=FALSE}
+### cleanup temp objects
+rm(samp_size)
+rm(train_ind)
+```
+
+#### Create Feature matrixes for train/test sets
+
+```{r build_trainfeaturemtx}
+trainfeatures<-select(
+  mutate(select(traindata,Id,Der_Month,DepTime,UniqueCarrier,Distance,Dest,Der_DepDelayed),
+         Month=Der_Month,
+         Hour=str_replace(DepTime, str_sub(DepTime,start=-2),""),
+         Carrier=UniqueCarrier,
+         Destination=Dest,
+         IsDelayed=Der_DepDelayed
+  )
+  ,Id,Month,Hour,Carrier,Distance,Destination,IsDelayed)
+
+# Add Distance Ranges as quartiles
+trainfeatures$DistanceRange <- cut2(trainfeatures$Distance,g=5)
+```
+
+```{r build_testfeaturemtx}
+#Create Test feature matrix
+testfeatures<-select(
+  mutate(select(testdata,Id,Der_Month,DepTime,UniqueCarrier,Distance,Dest,Der_DepDelayed),
+         Month=Der_Month,
+         Hour=str_replace(DepTime, str_sub(DepTime,start=-2),""),
+         Carrier=UniqueCarrier,
+         Destination=Dest,
+         IsDelayed=Der_DepDelayed
+  )
+  ,Id,Month,Hour,Carrier,Distance,Destination,IsDelayed)
+
+# Add Distance Ranges as quartiles
+testfeatures$DistanceRange <- cut2(testfeatures$Distance,g=5)
+```
+
+Lets see the structure of feature matrix
+```{r str_trainmtx }
+#structure of training matrix
+str(trainfeatures)
+
+#structure of test matrix
+str(trainfeatures)
+```
+
+```{r rmv_data,echo=FALSE}
+#Drop data ,since we can always recreate  from train and test sets
+rm(data)
+```
+
+#### Build the Model
+
+Now its time for the exciting part, we will have to train logistic  regression model with a formula  
+`target_variable ~ Indepedent_variable_1 * Indepedent_variable_2 ..Indepedent_variable_n`  
+
+`NOTE: Matrix multiplications takes lot of intermediate memory. Here I am using only 2 out of potential 5 variables due to my Laptop memory constraints (8GB Max). If you happen to have a big server ,please add all variables into the formula`
+
+
+```{r logistic_model}
+#define formular
+formula = "IsDelayed ~ Month * Hour"
+
+#train the algorithm with traindata
+glm.logit= glm(formula, family=binomial(logit), data=trainfeatures)
+
+```
+
+#### Predicting with test data
+
+```{r predict_testdata,error=FALSE}
+#Predict test set using glm.logit model
+predict <- predict(glm.logit,newdata=testfeatures,type="response")
+```
+
+Lets first define a function to calculate metrics
+
+```{r fn_getmetrics}
+# Function to compute Precision, Recall and F1-Measure
+get_metrics <- function(predicted, actual) {
+  tp = length(which(predicted == TRUE & actual == TRUE))
+  tn = length(which(predicted == FALSE & actual == FALSE))
+  fp = length(which(predicted == TRUE & actual == FALSE))
+  fn = length(which(predicted == FALSE & actual == TRUE))
+  
+  precision = tp / (tp+fp)
+  recall = tp / (tp+fn)
+  F1 = 2*precision*recall / (precision+recall)
+  accuracy = (tp+tn) / (tp+tn+fp+fn)
+  
+  v = c(precision, recall, F1, accuracy)
+  v
+}
+```
+
+The prediction is in terms of probability .Its usually between 0 and 1.  
+
+*Legend: 0=Definetly not delayed,1=Certainly delayed*
+
+So for our case if Probability is >=0.5 we consider it as **Delayed**.
+
+#### Evaluate model
+
+So now that we have predicted values on test data form algorithm,and the actual values from dataset we can cross valdiate the results and compute metrics
+
+
+```{r evalulate_modelmetrics}
+metrics = get_metrics(predict>= 0.5,as.logical(testfeatures$IsDelayed))
+
+print(sprintf("Logistic Regression Model1: precision=%0.2f, recall=%0.2f, F1=%0.2f, accuracy=%0.2f", 
+              metrics[1], metrics[2], metrics[3], metrics[4]))
+```
+
+As you can see there is 76% accuracy by using just 2 variables.Had I put through more variables it would take a long time to compute but the accuracy would go up.
+
+###Extension
+We are all aware weather makes a major impact of airline operations.So augumenting weather dataset to this data would further improve its results in prediction.
+
