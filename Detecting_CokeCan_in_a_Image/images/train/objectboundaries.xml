@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+<?xml-stylesheet type='text/xsl' href='image_metadata_stylesheet.xsl'?>
+<dataset>
+<name>imglab dataset</name>
+<comment>Created by imglab tool.</comment>
+<images>
+  <image file='img1.jpg'>
+    <box top='8' left='92' width='199' height='388'/>
+  </image>
+  <image file='img2.jpg'>
+    <box top='46' left='174' width='300' height='557'/>
+  </image>
+  <image file='img3.jpg'>
+    <box top='35' left='48' width='232' height='445'/>
+  </image>
+  <image file='img5.jpg'>
+    <box top='34' left='58' width='196' height='352'/>
+  </image>
+  <image file='img6.jpg'>
+    <box top='28' left='38' width='152' height='288'/>
+  </image>
+  <image file='img7.jpg'>
+    <box top='39' left='210' width='189' height='390'/>
+  </image>
+  <image file='img8.jpg'>
+    <box top='77' left='194' width='206' height='289'/>
+  </image>
+  <image file='img9.jpg'>
+    <box top='95' left='14' width='308' height='580'/>
+  </image>
+  <image file='img10.jpg'>
+    <box top='9' left='108' width='211' height='403'/>
+  </image>
+  <image file='img11.jpg'>
+    <box top='14' left='72' width='261' height='473'/>
+  </image>
+  <image file='img12.jpg'>
+    <box top='30' left='169' width='169' height='347'/>
+  </image>
+  <image file='img13.jpg'>
+    <box top='101' left='116' width='364' height='704'/>
+  </image>
+  <image file='img14.jpg'>
+    <box top='21' left='16' width='216' height='423'/>
+  </image>
+  <image file='img15.jpg'>
+    <box top='1' left='0' width='141' height='265'/>
+    <box top='0' left='206' width='145' height='267'/>
+    <box top='0' left='408' width='141' height='267'/>
+  </image>
+</images>
+</dataset>

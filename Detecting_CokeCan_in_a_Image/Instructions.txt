@@ -1,0 +1,7 @@
+I have not checked in dll's and python moduels for dlib since C++ executables are compiler specific and version specific.
+
+You need to complie dlib and its parent lib boost from its source code as explained here
+http://www.boost.org/doc/libs/1_58_0/libs/python/doc/building.html
+http://dlib.net/compile.html
+
+Also the imglab.exe need to be compiled from source if you need to edit the objectboundaries.xml from images\train folder.

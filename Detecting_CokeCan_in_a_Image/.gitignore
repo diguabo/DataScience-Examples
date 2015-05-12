@@ -1,0 +1,12 @@
+#Ignore custom files
+tools
+boost_python-vc120-mt-1_58.dll
+dlib.pyd
+msvcr90.dll
+msvcp90.dll
+train_img1.png
+train_img5.png
+
+
+
+
